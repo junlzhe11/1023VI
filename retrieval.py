@@ -71,31 +71,44 @@ def retrival_idx(queryIndex):
     # 在所有特徵處理完後排序
     if similarity_dict:
         sorted_similarity = sorted(similarity_dict.items(), key=lambda item: item[1])
-        best_five = sorted_similarity[-5:]  # 取相似度最高的5個
-        return best_five
+        best_ten = sorted_similarity[-10:]  # 取相似度最高的5個
+        return best_ten
     else:
         return []
 
-def visulization(retrived, query):
-    plt.subplot(2, 3, 1)
-    plt.title('query')
+def visulization(retrieved, query):
+    # 創建更大的畫布來顯示 1 個查詢 + 10 個結果
+    plt.figure(figsize=(20, 8))
+    
+    # 第一個子圖：查詢圖像
+    plt.subplot(2, 6, 1)  # 改為 2x6 的網格
+    plt.title('Query Image')
     query_img = cv2.imread(query)
     img_rgb_rgb = query_img[:,:,::-1]
     plt.imshow(img_rgb_rgb)
-    for i in range(5):
-        img_path = './data/gallery/' + retrived[i][0]
+    plt.axis('off')
+    
+    # 顯示前10個檢索結果
+    for i in range(min(10, len(retrieved))):  # 防止 retrieved 少於10個
+        img_path = './data/gallery/' + retrieved[i][0]
         img = cv2.imread(img_path)
         img_rgb = img[:,:,::-1]
-        plt.subplot(2, 3, i+2)
-        plt.title(retrived[i][1])
+        
+        # 計算子圖位置
+        plt.subplot(2, 6, i + 2)  # 第2到第11個位置
+        plt.title(f'Top {i+1}\nScore: {retrieved[i][1]:.3f}')
         plt.imshow(img_rgb)
+        plt.axis('off')
+    
+    plt.tight_layout()
     plt.show()
+    # save result
 
 if __name__ == '__main__':
     for queryIndex in range(50):
-        best_five = retrival_idx(queryIndex) # retrieve top 5 matching images in the gallery.
-        print(best_five)
-        best_five.reverse()
+        best_ten = retrival_idx(queryIndex) # retrieve top 5 matching images in the gallery.
+        print(best_ten)
+        best_ten.reverse()
         query_path = os.path.join(query_dir, f'{queryIndex}.jpg')
-        visulization(best_five, query_path) # Visualize the retrieval results
+        visulization(best_ten, query_path) # Visualize the retrieval results
 
