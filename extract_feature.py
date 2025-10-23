@@ -7,6 +7,7 @@ import numpy as np
 import torchvision.models as models
 import torchvision.transforms as transforms
 from tqdm import tqdm
+from ultralytics import YOLO
 
 query_dir = './data/query/'
 query_feat_dir = './data/query_feat/'
@@ -55,37 +56,21 @@ def query_crops(query_path, txt_path, queryIndex):
     print(f"Cropped {len(crops)} instances from {query_path}")
     return crops
 
-def resnet_extraction(img, featsave_path, model=None, resize=(224, 224)):
-    # 檢查是否有可用的GPU
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    resnet_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])])
-    
-    if resize is not None:
-        img = cv2.resize(img, resize, interpolation=cv2.INTER_CUBIC)
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
-    # 轉換為 tensor
-    img_transform = resnet_transform(img_rgb)
-    img_transform = torch.unsqueeze(img_transform, 0).to(device)  # 使用自動設備檢測
-    
-    # 如果沒有提供模型，則創建新的 ResNet
-    if model is None:
-        model = models.resnet101(pretrained=True)
-    
-    model = model.to(device)  # 移動模型到對應設備
-    model.eval()
-    
-    # 提取特徵
+def yolo_11_extraction(img, featsave_path):
+    yolo = YOLO("./data/model/yolo11n.pt").eval()
+    net= yolo.model
+    features = {}
+    def hook_fn(module, input, output):
+        features['feat'] = output
+    target_layer = net.model[22]
+    target_layer.register_forward_hook(hook_fn)
+    img_tensor = torch.from_numpy(img).permute(2,0,1).float().unsqueeze(0) / 255.0
     with torch.no_grad():
-        feats = model(img_transform)
-    
-    # 轉換為 numpy 並保存
-    feats_np = feats.cpu().detach().numpy()
-    np.save(featsave_path, feats_np)
+        _ = net(img_tensor)
+    feat_map = features['feat']  # tensor shape: [1, C, H, W]
+    feats = torch.mean(feat_map, dim=[2,3])
+    feats_np = feats.cpu().detach().numpy() # convert tensor to numpy
+    np.save(featsave_path, feats_np) # save the feature
 
 # Note that I feed the whole image into the pretrained vgg11 model to extract the feature, which will lead to a poor retrieval performance.
 # To extract more fine-grained features, you could preprocess the gallery images by cropping them using windows with different sizes and shapes.
@@ -93,15 +78,13 @@ def resnet_extraction(img, featsave_path, model=None, resize=(224, 224)):
 def feat_extractor_gallery(gallery_dir, gallery_feat_dir):
     # 檢查設備
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = models.resnet101(pretrained=True).to(device)
-    model.eval()
     
     for img_file in tqdm(os.listdir(gallery_dir)):
         img = cv2.imread(os.path.join(gallery_dir, img_file))
         img = img[:,:,::-1] #bgr2rgb
-        img_resize = cv2.resize(img, (224, 224), interpolation=cv2.INTER_CUBIC) # resize the image
+        img_resize = cv2.resize(img, (640, 640), interpolation=cv2.INTER_CUBIC) # resize the image
         featsave_path = os.path.join(gallery_feat_dir, img_file.split('.')[0]+'.npy')
-        resnet_extraction(img_resize, featsave_path, model=model)
+        yolo_11_extraction(img_resize, featsave_path)
 
 def feat_extractor_query():
     # 創建目錄（如果不存在）
@@ -109,11 +92,8 @@ def feat_extractor_query():
     os.makedirs(query_feat_dir, exist_ok=True)
     os.makedirs(query_box_dir, exist_ok=True)
     
-    # 檢查設備並預加載模型
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
-    model = models.resnet101(pretrained=True).to(device)
-    model.eval()
 
     # 處理50張查詢圖片 (0.jpg 到 49.jpg)
     for queryIndex in tqdm(range(50), desc="Processing query images"):
@@ -141,14 +121,14 @@ def feat_extractor_query():
                 crop = crops[cropIndex]
                 crop_resize = cv2.resize(crop, (224, 224), interpolation=cv2.INTER_CUBIC)
                 featsave_path = os.path.join(query_feat_dir, f'query{queryIndex}feat{cropIndex}.npy')
-                resnet_extraction(crop_resize, featsave_path, model=model)
+                yolo_11_extraction(crop_resize, featsave_path)
                 print(f"Successfully processed image {queryIndex} crop {cropIndex}")      
         except Exception as e:
             print(f"Error processing query image {queryIndex}: {e}")
 
 def main():
     feat_extractor_query()
-    # feat_extractor_gallery(gallery_dir, gallery_feat_dir)
+    feat_extractor_gallery(gallery_dir, gallery_feat_dir)
 
 if __name__=='__main__':
     main()
