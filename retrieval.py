@@ -12,6 +12,7 @@ query_box_dir = './data/query_box'
 query_cropped_dir = './data/cropped_query/'
 gallery_dir = './data/gallery/'
 gallery_feat_dir = './data/gallery_feature/'
+topTen_dir = './data/topTen/'
 
 # Measure the similarity scores between query feature and gallery features.
 # You could also use other metrics to measure the similarity scores between features.
@@ -81,7 +82,7 @@ def visulization(retrieved, query):
     plt.figure(figsize=(20, 8))
     
     # 第一個子圖：查詢圖像
-    plt.subplot(2, 6, 1)  # 改為 2x6 的網格
+    plt.subplot(2, 6, 1)
     plt.title('Query Image')
     query_img = cv2.imread(query)
     img_rgb_rgb = query_img[:,:,::-1]
@@ -89,20 +90,27 @@ def visulization(retrieved, query):
     plt.axis('off')
     
     # 顯示前10個檢索結果
-    for i in range(min(10, len(retrieved))):  # 防止 retrieved 少於10個
+    for i in range(min(10, len(retrieved))):
         img_path = './data/gallery/' + retrieved[i][0]
         img = cv2.imread(img_path)
         img_rgb = img[:,:,::-1]
         
-        # 計算子圖位置
-        plt.subplot(2, 6, i + 2)  # 第2到第11個位置
+        plt.subplot(2, 6, i + 2)
         plt.title(f'Top {i+1}\nScore: {retrieved[i][1]:.3f}')
         plt.imshow(img_rgb)
         plt.axis('off')
     
     plt.tight_layout()
-    plt.show()
-    # save result
+    
+    # 自動保存結果
+    os.makedirs(topTen_dir, exist_ok=True)
+    
+    query_index = os.path.basename(query).split('.')[0].replace('query', '')
+    save_path = os.path.join(topTen_dir, f'query{query_index}_retrieval_top10.png')
+    
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    print(f"Results saved: {save_path}")
+    plt.close()
 
 if __name__ == '__main__':
     for queryIndex in range(50):
