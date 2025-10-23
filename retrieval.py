@@ -21,7 +21,7 @@ def similarity(query_feat, gallery_feat):
     sim = np.squeeze(sim)
     return sim
 
-def retrival_idx(queryIndex):
+def retrival_ranklist(queryIndex):
     results = []  # 儲存兩種特徵的檢索結果
     similarity_dict = {}  # 移到外面，讓兩個特徵可以共用
     
@@ -71,9 +71,8 @@ def retrival_idx(queryIndex):
     
     # 在所有特徵處理完後排序
     if similarity_dict:
-        sorted_similarity = sorted(similarity_dict.items(), key=lambda item: item[1])
-        best_ten = sorted_similarity[-10:]  # 取相似度最高的5個
-        return best_ten
+        sorted_similarity = sorted(similarity_dict.items(), key=lambda item: item[1], reverse=True)
+        return sorted_similarity
     else:
         return []
 
@@ -113,10 +112,40 @@ def visulization(retrieved, query):
     plt.close()
 
 if __name__ == '__main__':
+    # Create a list to store all ranklist lines
+    all_ranklists = []
+    
     for queryIndex in range(50):
-        best_ten = retrival_idx(queryIndex) # retrieve top 5 matching images in the gallery.
-        print(best_ten)
-        best_ten.reverse()
+        ranklist = retrival_ranklist(queryIndex) # retrieve top matching images in the gallery.
+        best_ten = ranklist[:10]
+        print(f"Query {queryIndex} - Top 10: {best_ten}")
+        
+        # Create ranklist line for this query - include ALL results
+        if ranklist:
+            # Extract numeric IDs from gallery filenames (remove .jpg extension)
+            rank_ids = []
+            for gallery_file, score in ranklist:
+                img_id = gallery_file.replace('.jpg', '')
+                rank_ids.append(img_id)
+            
+            # Format: "Q1: 7 12 214 350 ..." with ALL IDs, no omission
+            ranklist_line = f"Q{queryIndex + 1}: " + " ".join(rank_ids)
+        else:
+            ranklist_line = f"Q{queryIndex + 1}:"
+        
+        all_ranklists.append(ranklist_line)
+        
         query_path = os.path.join(query_dir, f'{queryIndex}.jpg')
         visulization(best_ten, query_path) # Visualize the retrieval results
-
+    
+    # Save all ranklists to a single file with complete data
+    os.makedirs('./data/ranklists/', exist_ok=True)
+    ranklist_file_path = './data/ranklists/ranklist_complete.txt'
+    
+    with open(ranklist_file_path, 'w') as f:
+        for line in all_ranklists:
+            f.write(line + '\n')
+    
+    print(f"Complete ranklists saved to: {ranklist_file_path}")
+    print(f"Total queries processed: {len(all_ranklists)}")
+    print(f"Each line contains all retrieval results for that query")
