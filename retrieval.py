@@ -22,27 +22,27 @@ def similarity(query_feat, gallery_feat):
     return sim
 
 def retrival_ranklist(queryIndex):
-    results = []  # 儲存兩種特徵的檢索結果
-    similarity_dict = {}  # 移到外面，讓兩個特徵可以共用
+    results = []  # Store retrieval results for both features
+    similarity_dict = {}  # Moved outside to be shared between both features
     
-    for feat_idx in range(2):  # 處理 feat0 和 feat1
+    for feat_idx in range(2):  # Process feat0 and feat1
         query_feat_path = os.path.join(query_feat_dir, f'query{queryIndex}feat{feat_idx}.npy')
         
-        # 檢查特徵文件是否存在
+        # Check if feature file exists
         if not os.path.exists(query_feat_path):
             print(f"Warning: Feature file {query_feat_path} not found, skipping...")
             continue
             
         try:
-            # 載入查詢特徵
+            # Load query feature
             query_feat = np.load(query_feat_path)
             
-            # 遍歷 gallery 特徵文件
+            # Iterate through gallery feature files
             for gallery_feat_file in os.listdir(gallery_feat_dir):
-                # 修正：使用 gallery_feat_file 而不是 cnt
+                # Use gallery_feat_file instead of cnt
                 gallery_feat_path = os.path.join(gallery_feat_dir, gallery_feat_file)
                 
-                # 檢查 gallery 特徵文件是否存在
+                # Check if gallery feature file exists
                 if not os.path.exists(gallery_feat_path):
                     continue
                     
@@ -52,10 +52,10 @@ def retrival_ranklist(queryIndex):
                     sim = similarity(query_feat, gallery_feat)
                     
                     if feat_idx == 0:
-                        # 第一次特徵，直接存入
+                        # First feature, store directly
                         similarity_dict[gallery_idx] = sim
                     else:
-                        # 第二次特徵，取最大值
+                        # Second feature, take maximum value
                         if gallery_idx in similarity_dict:
                             similarity_dict[gallery_idx] = max(sim, similarity_dict[gallery_idx])
                         else:
@@ -69,7 +69,7 @@ def retrival_ranklist(queryIndex):
             print(f"Error processing feature {query_feat_path}: {e}")
             continue
     
-    # 在所有特徵處理完後排序
+    # Sort after processing all features
     if similarity_dict:
         sorted_similarity = sorted(similarity_dict.items(), key=lambda item: item[1], reverse=True)
         return sorted_similarity
@@ -77,10 +77,10 @@ def retrival_ranklist(queryIndex):
         return []
 
 def visulization(retrieved, query):
-    # 創建更大的畫布來顯示 1 個查詢 + 10 個結果
+    # Create larger canvas to display 1 query + 10 results
     plt.figure(figsize=(20, 8))
     
-    # 第一個子圖：查詢圖像
+    # First subplot: Query image
     plt.subplot(2, 6, 1)
     plt.title('Query Image')
     query_img = cv2.imread(query)
@@ -88,7 +88,7 @@ def visulization(retrieved, query):
     plt.imshow(img_rgb_rgb)
     plt.axis('off')
     
-    # 顯示前10個檢索結果
+    # Display top 10 retrieval results
     for i in range(min(10, len(retrieved))):
         img_path = './data/gallery/' + retrieved[i][0]
         img = cv2.imread(img_path)
@@ -101,7 +101,7 @@ def visulization(retrieved, query):
     
     plt.tight_layout()
     
-    # 自動保存結果
+    # Automatically save results
     os.makedirs(topTen_dir, exist_ok=True)
     
     query_index = os.path.basename(query).split('.')[0].replace('query', '')
